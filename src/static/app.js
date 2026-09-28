@@ -304,6 +304,34 @@ document.addEventListener("DOMContentLoaded", () => {
     return details.schedule;
   }
 
+  function buildActivityShareContent(name, details) {
+    const shareText = `Check out this activity at Mergington High School: ${name}. ${formatSchedule(
+      details
+    )}.`;
+    const shareUrl = `${window.location.origin}${
+      window.location.pathname
+    }?activity=${encodeURIComponent(name)}`;
+
+    return {
+      text: shareText,
+      url: shareUrl,
+    };
+  }
+
+  async function copyToClipboard(text) {
+    if (!navigator.clipboard) {
+      return false;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (error) {
+      console.error("Failed to copy to clipboard:", error);
+      return false;
+    }
+  }
+
   // Function to determine activity type (this would ideally come from backend)
   function getActivityType(activityName, description) {
     const name = activityName.toLowerCase();
@@ -569,6 +597,14 @@ document.addEventListener("DOMContentLoaded", () => {
         `
         }
       </div>
+      <div class="share-actions">
+        <button class="share-button share-native" data-activity="${name}">
+          Share
+        </button>
+        <button class="share-button share-copy-link" data-activity="${name}">
+          Copy Link
+        </button>
+      </div>
     `;
 
     // Add click handlers for delete buttons
@@ -586,6 +622,48 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
     }
+
+    const shareData = buildActivityShareContent(name, details);
+    const nativeShareButton = activityCard.querySelector(".share-native");
+    const copyLinkButton = activityCard.querySelector(".share-copy-link");
+
+    nativeShareButton.addEventListener("click", async () => {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: `${name} | Mergington High School`,
+            text: shareData.text,
+            url: shareData.url,
+          });
+          return;
+        } catch (error) {
+          if (error.name !== "AbortError") {
+            console.error("Native share failed:", error);
+          }
+        }
+      }
+
+      const copied = await copyToClipboard(shareData.url);
+      if (copied) {
+        showMessage("Activity link copied. Share it with your friends!", "success");
+      } else {
+        window.open(
+          `mailto:?subject=${encodeURIComponent(
+            `${name} at Mergington High School`
+          )}&body=${encodeURIComponent(`${shareData.text}\n${shareData.url}`)}`,
+          "_blank"
+        );
+      }
+    });
+
+    copyLinkButton.addEventListener("click", async () => {
+      const copied = await copyToClipboard(shareData.url);
+      if (copied) {
+        showMessage("Activity link copied. Share it with your friends!", "success");
+      } else {
+        showMessage("Copy not supported on this browser. Please copy the page URL.", "info");
+      }
+    });
 
     activitiesList.appendChild(activityCard);
   }
